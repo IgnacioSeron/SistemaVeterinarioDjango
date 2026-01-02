@@ -7,35 +7,46 @@ from django.core.exceptions import ValidationError
 #Solo deja pasar 9 números de teléfono con un prefijo ya definido +56
 telefono_validador = RegexValidator(
     regex=r'^\d{9}$',
-    message="El Número Debe Tener Exactamente 9 Dígitos."
+    message="El Número Debe Tener 9 Dígitos."
 )
 
 #Validador y limpiador de RUT antes de ingresarlo a la DB
 def validar_rut(value):
-    #Limpiar el RUT de puntos y guiones
-    rut = value.replace(".", "").replace("-", "").upper()
+    #Limpieza total
+    rut = str(value).replace(".", "").replace("-", "").upper().strip()
     
-    #Validar formato básico (7 a 8 dígitos + dígito verificador)
+    #Formato (8 a 9 caracteres)
     if not re.match(r"^\d{7,8}[\dK]$", rut):
         raise ValidationError("Formato de RUT Inválido.")
 
-    #Algoritmo Módulo 11 
+    #Cálculo del Módulo 11
     cuerpo = rut[:-1]
-    dv = rut[-1]
+    dv_ingresado = rut[-1]
     
     suma = 0
     multiplicador = 2
+    
+    #Recorrer de derecha a izquierda
     for c in reversed(cuerpo):
         suma += int(c) * multiplicador
-        multiplicador = multiplicador + 1 if multiplicador > 7 else 2
+        if multiplicador == 7:
+            multiplicador = 2
+        else:
+            multiplicador += 1
     
-    dv_esperado = 11 - (suma % 11)
-    if dv_esperado == 11: dv_esperado = '0'
-    elif dv_esperado == 10: dv_esperado = 'K'
-    else: dv_esperado = str(dv_esperado)
+    #Obtener el DV esperado
+    resto = suma % 11
+    valor_esperado = 11 - resto
+    
+    if valor_esperado == 11:
+        dv_real = '0'
+    elif valor_esperado == 10:
+        dv_real = 'K'
+    else:
+        dv_real = str(valor_esperado)
 
-    if dv != dv_esperado:
-        raise ValidationError("El RUT Es Inválido ")
+    if dv_ingresado != dv_real:
+        raise ValidationError(f"El RUT es Inválido. (Para El Cuerpo {cuerpo}, El DV Debería Ser {dv_real})")
 
 # Create your models here.
 class Usuario(AbstractUser):
